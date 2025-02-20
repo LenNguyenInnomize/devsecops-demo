@@ -1,0 +1,118 @@
+name: CI Check Backend Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'apps/backend/**'
+
+jobs:
+  scanning:
+    runs-on: [self-hosted, sls-monorepo-starter-be]
+    steps:
+      - name: Cache Dependency Check Data
+        id: cache-dependency-check
+        uses: actions/cache@v3
+        with:
+          path: ~/.dependency-check
+          key: ${{ runner.os }}-dependency-check-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-dependency-check-
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.6.0'
+
+      - name: Install SonarQube Scanner
+        run: |
+          export PATH=$PATH:/usr/sonar-scanner/bin
+          echo "/usr/sonar-scanner/bin" >> $GITHUB_PATH
+          echo "SonarQube Scanner installed at: $(which sonar-scanner)"
+          sonar-scanner --version
+
+      - name: Create Folder Reports
+        run: mkdir -p reports/dependency-check
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+          check-latest: true
+
+      - name: Set JAVA_HOME
+        run: echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Install Dependencies
+        run: |
+          npm install -g pnpm yarn
+          pnpm install
+
+      - name: Run dependency check
+        run: /usr/dependency-check/bin/dependency-check.sh --format ALL -s . --out reports/dependency-check --project "INNOMIZE-DevKit_sls-monorepo-starter_18f12cc0-d5af-4b47-8600-186961a10133" --nvdApiKey 1d2777f6-a7c7-4204-bc27-60318d8a81d2 --disableBundleAudit --disableRetireJS --noupdate
+
+      # - name: Upload Dependency Check Reports
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: dependency-check-reports
+      #     path: reports/
+
+      # check with multiple branch
+      - name: Run SonarQube Scanner Backend
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=INNOMIZE-DevKit_sls-monorepo-starter_18f12cc0-d5af-4b47-8600-186961a10133 \
+            -Dsonar.projectName=sls-monorepo-starter \
+            -Dsonar.projectVersion=1.0 \
+            -Dsonar.sources=apps/backend,libs,package.json \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.exclusions=./reports/dependency-check/**/* \
+            -Dsonar.licensecheck.enabled=true \
+            -Dsonar.dependencyCheck.jsonReportPath=./reports/dependency-check/dependency-check-report.json \
+            -Dsonar.dependencyCheck.htmlReportPath=./reports/dependency-check/dependency-check-report.html \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }} \
+            -Dsonar.pullrequest.github.repository=${{ github.repository }} \
+            -Dsonar.qualitygate.wait=true
+
+      # Check the Quality Gate status.
+      - name: SonarQube Quality Gate Check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      # Show the output from the Quality Gate.
+      # The possible outputs of the `quality-gate-status` variable are `PASSED`, `WARN` or `FAILED`.
+      - name: 'Here is SonarQube Quality Gate Status value..'
+        run: echo "The Quality Gate status is ${{ steps.sonarqube-quality-gate-check.outputs.quality-gate-status }}"
+
+  build:
+    runs-on: [self-hosted, sls-monorepo-starter-be]
+    needs: scanning
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.6.0'
+
+      - name: Install Dependencies
+        run: |
+          npm install -g pnpm yarn
+          pnpm install
+
+      - name: Check Lint
+        run: pnpm run lint
+
+      - name: Build project
+        run: pnpm run build:backend
