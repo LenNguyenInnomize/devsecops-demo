@@ -5,8 +5,13 @@ import dotenv from "dotenv";
 // Load environment variables từ .env
 dotenv.config();
 
-const app = express();
-app.use(cors());
+let corsOptions = {
+  origin: 'trustedwebsite.com' // Compliant
+};
+
+let app = express();
+app.disable("x-powered-by");
+app.use(cors(corsOptions));
 
 const API_SECRET_KEY = process.env.API_SECRET_KEY || "fallback-key"; // ✅ Load từ .env
 
