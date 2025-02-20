@@ -15,7 +15,7 @@ function App() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    axios.get("http://localhost:3000/api/user")
+    axios.get("http://192.168.1.179:8092/api/user")
       .then((response) => {
         setUser(response.data);
         setLoading(false);
