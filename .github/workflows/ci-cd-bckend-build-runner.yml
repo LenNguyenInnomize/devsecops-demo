@@ -78,7 +78,7 @@ jobs:
             -Dsonar.projectKey=devsecops-demo-backend \
             -Dsonar.projectName=devsecops-demo-backend \
             -Dsonar.projectVersion=1.0 \
-            -Dsonar.sources=apps/frontend,package.json \
+            -Dsonar.sources=apps/backend,package.json \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_BACKEND }} \
             -Dsonar.exclusions=./reports/dependency-check/**/* \
